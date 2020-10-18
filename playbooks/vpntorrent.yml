@@ -1,0 +1,97 @@
+---
+- hosts: vpntorrent.local
+  become: True
+
+  tasks:
+  - name: werk apt bij
+    apt:
+      upgrade: yes
+      update_cache: yes
+
+  - name: install vpn
+    apt:
+      name: openvpn
+      state: latest
+
+  - name: install deluged
+    apt:
+      name: deluged
+      state: latest
+      
+  - name: install deluge-web
+    apt:
+      name: deluge-web
+      state: latest
+# 192.168.1.20:/volume2/deluge   /mnt/deluge   nfs    rw  0  0
+  - name: mount pluisje deluge map
+    ansible.posix.mount:
+      src: 192.168.1.20:/volume2/deluge
+      path: /mnt/deluge
+      opts: rw
+      state: mounted
+      fstype: nfs
+
+  - name: group for deluge
+    group:
+      name: deluge
+      state: present
+
+  - name: add user for deluge
+    user:
+      name: deluge
+      group: deluge
+      system: yes
+      home: /var/lib/deluge
+      state: present
+      comment: Deluge Service
+
+  - name: Voeg pi toe aan de deluge groep
+    user:
+      name: pi
+      append: yes
+      groups:
+        - deluge
+
+  - name: Maak deluged systemd file
+    copy:
+      src: deluged.service
+      dest: /etc/systemd/system/deluged.service
+      mode: '0644'
+
+  - name: Maak deluged systemd
+    systemd:
+      name: deluged.service
+      enabled: yes
+      scope: system
+      state: started
+
+  - name: Maak deluge-web systemd file
+    copy:
+      src: deluge-web.service
+      dest: /etc/systemd/system/deluge-web.service
+      mode: '0644'
+
+  - name: Maak deluge-web systemd
+    systemd:
+      name: deluge-web
+      enabled: yes
+      scope: system
+      state: started
+
+  - name: Configureer openvpn client - 1
+    copy:
+      src: Netherlands.ovpn
+      dest: /etc/openvpn/Netherlands.ovpn.conf
+
+  - name: Configureer openvpn client - 2
+    copy:
+      src: login.pass
+      dest: /etc/openvpn/login.pass
+      mode: '0700'
+
+  - name: Configureer openvpn client - 3
+    systemd:
+      name: openvpn@Netherlands.ovpn
+      enabled: yes
+      scope: system
+      state: started
